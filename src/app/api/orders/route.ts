@@ -4,6 +4,9 @@ import prisma from '@/lib/prisma'
 export const dynamic = 'force-dynamic'
 
 export async function GET(request: Request) {
+  if (!prisma) {
+    return NextResponse.json({ orders: [] })
+  }
   try {
     const { searchParams } = new URL(request.url)
     const status = searchParams.get('status')
@@ -26,6 +29,9 @@ export async function GET(request: Request) {
 }
 
 export async function POST(request: Request) {
+  if (!prisma) {
+    return NextResponse.json({ error: 'Database not configured' }, { status: 503 })
+  }
   try {
     const body = await request.json()
     const { customerName, customerPhone, customerAddress, orderType, items, total } = body

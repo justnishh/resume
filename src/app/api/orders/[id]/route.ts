@@ -7,6 +7,9 @@ export async function GET(
   request: Request,
   { params }: { params: { id: string } }
 ) {
+  if (!prisma) {
+    return NextResponse.json({ error: 'Database not configured' }, { status: 503 })
+  }
   try {
     const order = await prisma.order.findUnique({
       where: { id: params.id },
@@ -31,6 +34,9 @@ export async function PUT(
   request: Request,
   { params }: { params: { id: string } }
 ) {
+  if (!prisma) {
+    return NextResponse.json({ error: 'Database not configured' }, { status: 503 })
+  }
   try {
     const body = await request.json()
     const { status } = body

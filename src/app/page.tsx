@@ -1,24 +1,30 @@
 import Link from 'next/link'
 import Image from 'next/image'
+import prisma from '@/lib/prisma'
 
 export const dynamic = 'force-dynamic'
 
 async function getFeaturedItems() {
-  const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000'}/api/menu-items`, { 
-    cache: 'no-store' 
-  })
-  if (!res.ok) return []
-  const data = await res.json()
-  return data.items?.slice(0, 6) || []
+  if (!prisma) return []
+  try {
+    const items = await prisma.menuItem.findMany({
+      take: 6,
+      include: { category: true }
+    })
+    return items
+  } catch {
+    return []
+  }
 }
 
 async function getCategories() {
-  const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000'}/api/categories`, { 
-    cache: 'no-store' 
-  })
-  if (!res.ok) return []
-  const data = await res.json()
-  return data.categories || []
+  if (!prisma) return []
+  try {
+    const categories = await prisma.category.findMany()
+    return categories
+  } catch {
+    return []
+  }
 }
 
 export default async function Home() {
@@ -57,7 +63,7 @@ export default async function Home() {
       <section className="py-16 px-4 max-w-7xl mx-auto">
         <h2 className="text-3xl font-heading font-bold text-center mb-12">Browse Categories</h2>
         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
-          {categories.map((cat: { id: string; name: string; slug: string }) => (
+          {categories.map((cat) => (
             <Link 
               key={cat.id} 
               href={`/menu?category=${cat.slug}`}
@@ -73,7 +79,7 @@ export default async function Home() {
         <div className="max-w-7xl mx-auto">
           <h2 className="text-3xl font-heading font-bold text-center mb-12">Popular Items</h2>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {items.map((item: { id: string; name: string; description: string; price: number; image: string }) => (
+            {items.map((item) => (
               <div key={item.id} className="bg-background rounded-xl overflow-hidden shadow-sm hover:shadow-lg transition-shadow">
                 <div className="relative h-48">
                   <Image 
