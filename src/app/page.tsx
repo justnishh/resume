@@ -13,7 +13,7 @@ export default function Home() {
             </div>
             <div className="flex items-center gap-4">
               <Link
-                href="/api/auth/signin"
+                href="/auth/signin"
                 className="text-sm font-medium hover:text-primary transition-colors"
               >
                 Sign In
@@ -41,7 +41,7 @@ export default function Home() {
               all in one powerful dashboard.
             </p>
             <div className="flex flex-col sm:flex-row gap-4 justify-center">
-              <Link href="/dashboard" className="btn btn-primary text-lg px-8 py-3">
+              <Link href="/auth/signin" className="btn btn-primary text-lg px-8 py-3">
                 Start Free
               </Link>
               <Link href="#features" className="btn btn-outline text-lg px-8 py-3">
