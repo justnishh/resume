@@ -18,11 +18,6 @@ export interface ScrapedJob {
   source: 'linkedin' | 'indeed'
 }
 
-const ACTOR_IDS = {
-  linkedin: 'preruntime/linkedin-jobs-scraper',
-  indeed: 'dropty/indeed-scraper',
-}
-
 export async function scrapeLinkedInJobs(
   searchTerm: string,
   location?: string,
@@ -34,45 +29,45 @@ export async function scrapeLinkedInJobs(
 
   try {
     const input = {
-      searchTerms: [searchTerm],
+      keyword: searchTerm,
       location: location || 'Worldwide',
-      maxResults: limit,
+      limit: limit,
     }
 
-    console.log('LinkedIn scraper: Starting with input:', JSON.stringify(input))
+    console.log('LinkedIn: Starting scrape...')
 
-    const run = await client.actor(ACTOR_IDS.linkedin).call(input) as any
+    const run = await client.actor('apify/linkedin-jobs-scraper').call(input) as any
 
-    console.log('LinkedIn scraper: Run status:', run.status, 'Dataset ID:', run.defaultDatasetId)
+    console.log('LinkedIn: Run ID:', run.id, 'Status:', run.status)
 
     if (!run.defaultDatasetId) {
-      throw new Error('No dataset returned from LinkedIn scraper')
+      throw new Error('No data returned from LinkedIn')
     }
 
     const datasetClient = client.dataset(run.defaultDatasetId)
     const datasetResult = await datasetClient.listItems({ limit: 100 })
     const items = datasetResult.items || []
 
-    console.log('LinkedIn scraper: Got', items.length, 'items')
+    console.log('LinkedIn: Found', items.length, 'jobs')
 
     if (items.length === 0) {
-      throw new Error('No jobs found for this search')
+      throw new Error('No jobs found on LinkedIn')
     }
 
     return items.slice(0, limit).map((item: any) => ({
-      title: item.title || '',
+      title: item.title || item.position || '',
       company: item.companyName || item.company || '',
-      location: item.location || '',
-      jobUrl: item.url || item.link || '',
+      location: item.location || item.jobLocation || '',
+      jobUrl: item.url || item.link || item.jobUrl || '',
       description: item.description?.substring(0, 1000) || '',
-      salaryMin: item.salary?.min || item.salaryMin,
-      salaryMax: item.salary?.max || item.salaryMax,
-      postedAt: item.postedAt || item.date,
+      salaryMin: item.salaryMin || item.minSalary,
+      salaryMax: item.salaryMax || item.maxSalary,
+      postedAt: item.postedAt || item.dateAgo || item.published,
       source: 'linkedin' as const,
     }))
   } catch (error) {
-    console.error('LinkedIn scraper error:', error)
-    throw error
+    console.error('LinkedIn scrape error:', error)
+    throw new Error(`LinkedIn scraping failed: ${error instanceof Error ? error.message : 'Unknown error'}`)
   }
 }
 
@@ -87,52 +82,52 @@ export async function scrapeIndeedJobs(
 
   try {
     const input = {
-      searchTerm,
+      search: searchTerm,
       location: location || 'Worldwide',
       maxResults: limit,
     }
 
-    console.log('Indeed scraper: Starting with input:', JSON.stringify(input))
+    console.log('Indeed: Starting scrape...')
 
-    const run = await client.actor(ACTOR_IDS.indeed).call(input) as any
+    const run = await client.actor('dropty/indeed-scraper').call(input) as any
 
-    console.log('Indeed scraper: Run status:', run.status, 'Dataset ID:', run.defaultDatasetId)
+    console.log('Indeed: Run ID:', run.id, 'Status:', run.status)
 
     if (!run.defaultDatasetId) {
-      throw new Error('No dataset returned from Indeed scraper')
+      throw new Error('No data returned from Indeed')
     }
 
     const datasetClient = client.dataset(run.defaultDatasetId)
     const datasetResult = await datasetClient.listItems({ limit: 100 })
     const items = datasetResult.items || []
 
-    console.log('Indeed scraper: Got', items.length, 'items')
+    console.log('Indeed: Found', items.length, 'jobs')
 
     if (items.length === 0) {
-      throw new Error('No jobs found for this search')
+      throw new Error('No jobs found on Indeed')
     }
 
     return items.slice(0, limit).map((item: any) => ({
       title: item.title || '',
-      company: item.company || '',
-      location: item.location || '',
+      company: item.company || item.companyName || '',
+      location: item.location || item.jobLocation || '',
       jobUrl: item.url || item.link || '',
       description: item.description?.substring(0, 1000) || '',
-      salaryMin: item.salary?.min,
-      salaryMax: item.salary?.max,
-      postedAt: item.date,
+      salaryMin: item.salary?.min || item.minSalary,
+      salaryMax: item.salary?.max || item.maxSalary,
+      postedAt: item.date || item.postedAt,
       source: 'indeed' as const,
     }))
   } catch (error) {
-    console.error('Indeed scraper error:', error)
-    throw error
+    console.error('Indeed scrape error:', error)
+    throw new Error(`Indeed scraping failed: ${error instanceof Error ? error.message : 'Unknown error'}`)
   }
 }
 
 export async function scrapeJobs(
   searchTerm: string,
   location?: string,
-  sources: ('linkedin' | 'indeed')[] = ['linkedin', 'indeed'],
+  sources: ('linkedin' | 'indeed')[] = ['linkedin'],
   limitPerSource = 10
 ): Promise<ScrapedJob[]> {
   const results: ScrapedJob[] = []
@@ -140,12 +135,15 @@ export async function scrapeJobs(
 
   for (const source of sources) {
     try {
+      console.log(`Scraping ${source}...`)
       if (source === 'linkedin') {
         const jobs = await scrapeLinkedInJobs(searchTerm, location, limitPerSource)
         results.push(...jobs)
+        console.log(`LinkedIn: Got ${jobs.length} jobs`)
       } else if (source === 'indeed') {
         const jobs = await scrapeIndeedJobs(searchTerm, location, limitPerSource)
         results.push(...jobs)
+        console.log(`Indeed: Got ${jobs.length} jobs`)
       }
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Unknown error'
@@ -155,7 +153,7 @@ export async function scrapeJobs(
   }
 
   if (results.length === 0) {
-    throw new Error(`No jobs found. Errors: ${errors.join(', ')}`)
+    throw new Error(`No jobs found. Errors: ${errors.join('; ')}`)
   }
 
   return results
