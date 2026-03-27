@@ -6,50 +6,8 @@ import { z } from 'zod'
 
 const resumeSchema = z.object({
   versionName: z.string().min(1),
-  isDefault: z.boolean().default(false),
-  data: z.object({
-    personalInfo: z.object({
-      fullName: z.string().min(1),
-      email: z.string().email(),
-      phone: z.string().optional(),
-      location: z.string().optional(),
-      website: z.string().optional(),
-      linkedin: z.string().optional(),
-      summary: z.string().optional(),
-    }),
-    experience: z.array(z.object({
-      id: z.string().optional(),
-      company: z.string(),
-      title: z.string(),
-      location: z.string().optional(),
-      startDate: z.string(),
-      endDate: z.string().optional(),
-      isCurrent: z.boolean().default(false),
-      description: z.string().optional(),
-    })),
-    education: z.array(z.object({
-      id: z.string().optional(),
-      institution: z.string(),
-      degree: z.string(),
-      field: z.string().optional(),
-      startDate: z.string(),
-      endDate: z.string().optional(),
-      isCurrent: z.boolean().default(false),
-      description: z.string().optional(),
-    })),
-    skills: z.array(z.object({
-      name: z.string(),
-      category: z.string().default('technical'),
-    })),
-    projects: z.array(z.object({
-      name: z.string(),
-      description: z.string().optional(),
-      url: z.string().optional(),
-      technologies: z.string().optional(),
-      startDate: z.string().optional(),
-      endDate: z.string().optional(),
-    })),
-  }),
+  isDefault: z.boolean().optional().default(false),
+  data: z.any(),
 })
 
 export async function GET() {
@@ -108,7 +66,8 @@ export async function POST(request: Request) {
     return NextResponse.json(resume, { status: 201 })
   } catch (error) {
     if (error instanceof z.ZodError) {
-      return NextResponse.json({ error: error.errors }, { status: 400 })
+      console.error('Validation error:', error.errors)
+      return NextResponse.json({ error: 'Invalid data', details: error.errors }, { status: 400 })
     }
     console.error('Error creating resume:', error)
     return NextResponse.json({ error: 'Failed to create resume' }, { status: 500 })
