@@ -1,6 +1,0 @@
-{
-  "/api/categories/route": "app/api/categories/route.js",
-  "/api/menu-items/route": "app/api/menu-items/route.js",
-  "/page": "app/page.js",
-  "/admin/page": "app/admin/page.js"
-}
