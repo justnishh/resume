@@ -23,7 +23,11 @@ export async function POST(request: Request) {
     const body = await request.json()
     const { searchTerm, location, sources, limitPerSource } = scrapeSchema.parse(body)
 
+    console.log('Scraping jobs:', { searchTerm, location, sources, limitPerSource })
+
     const scrapedJobs = await scrapeJobs(searchTerm, location, sources, limitPerSource)
+
+    console.log('Found', scrapedJobs.length, 'jobs')
 
     const savedJobs = await Promise.all(
       scrapedJobs.map(async (job) => {
@@ -47,7 +51,7 @@ export async function POST(request: Request) {
             jobUrl: job.jobUrl || null,
             description: job.description || null,
             salaryMin: job.salaryMin || null,
-            salaryMax: job.salaryMax ? parseInt(job.salaryMax) : null,
+            salaryMax: job.salaryMax ? parseInt(String(job.salaryMax)) : null,
             source: job.source === 'linkedin' ? 'linkedin' : 'indeed',
             scrapedAt: new Date(),
           },
@@ -61,10 +65,12 @@ export async function POST(request: Request) {
       jobs: savedJobs,
     })
   } catch (error) {
-    if (error instanceof z.ZodError) {
-      return NextResponse.json({ error: error.errors }, { status: 400 })
-    }
-    console.error('Error scraping jobs:', error)
-    return NextResponse.json({ error: 'Failed to scrape jobs' }, { status: 500 })
+    const message = error instanceof Error ? error.message : 'Unknown error'
+    console.error('Scraping error:', message)
+    return NextResponse.json({ 
+      error: 'Failed to scrape jobs',
+      details: message,
+      hint: 'Check that your Apify token is valid and you have credits available'
+    }, { status: 500 })
   }
 }

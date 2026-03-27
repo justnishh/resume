@@ -4,14 +4,14 @@ import { useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { useSession } from 'next-auth/react'
-import { Search, ArrowLeft, Loader2, Briefcase } from 'lucide-react'
+import { Search, ArrowLeft, Loader2, AlertCircle } from 'lucide-react'
 
 export default function SearchJobsPage() {
   const { data: session, status } = useSession()
   const router = useRouter()
-  const [loading, setLoading] = useState(false)
   const [searching, setSearching] = useState(false)
   const [results, setResults] = useState<any[]>([])
+  const [error, setError] = useState('')
   const [form, setForm] = useState({
     searchTerm: '',
     location: '',
@@ -35,6 +35,7 @@ export default function SearchJobsPage() {
     e.preventDefault()
     setSearching(true)
     setResults([])
+    setError('')
 
     try {
       const res = await fetch('/api/jobs/scrape', {
@@ -43,12 +44,16 @@ export default function SearchJobsPage() {
         body: JSON.stringify(form),
       })
 
-      if (res.ok) {
-        const data = await res.json()
-        setResults(data.jobs || [])
+      const data = await res.json()
+
+      if (!res.ok) {
+        setError(data.details || data.error || 'Failed to scrape jobs')
+        return
       }
-    } catch (error) {
-      console.error('Error scraping jobs:', error)
+
+      setResults(data.jobs || [])
+    } catch (err: any) {
+      setError(err.message || 'Network error')
     } finally {
       setSearching(false)
     }
@@ -82,6 +87,16 @@ export default function SearchJobsPage() {
             <p className="text-muted-foreground">Search and import jobs from job boards</p>
           </div>
         </div>
+
+        {error && (
+          <div className="mb-6 p-4 bg-destructive/10 border border-destructive/20 rounded-lg flex items-start gap-3">
+            <AlertCircle className="h-5 w-5 text-destructive shrink-0 mt-0.5" />
+            <div>
+              <p className="font-medium text-destructive">Error</p>
+              <p className="text-sm text-destructive/80">{error}</p>
+            </div>
+          </div>
+        )}
 
         <form onSubmit={handleScrape} className="card p-6 mb-8">
           <div className="space-y-4">

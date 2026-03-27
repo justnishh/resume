@@ -19,26 +19,8 @@ export interface ScrapedJob {
 }
 
 const ACTOR_IDS = {
-  linkedin: 'apify/linkedin-jobs-scraper',
-  indeed: 'apify/indeed-scraper',
-}
-
-function getMockJobs(searchTerm: string, location: string | undefined, source: 'linkedin' | 'indeed'): ScrapedJob[] {
-  const companies = ['Google', 'Microsoft', 'Amazon', 'Meta', 'Apple', 'Netflix', 'Stripe', 'Airbnb']
-  const mockJobs: ScrapedJob[] = []
-
-  for (let i = 0; i < 5; i++) {
-    mockJobs.push({
-      title: `${searchTerm}`,
-      company: companies[i % companies.length],
-      location: location || 'Remote',
-      jobUrl: `https://example.com/jobs/${source}-${i}`,
-      description: `We are looking for a ${searchTerm} to join our team. This is a great opportunity!`,
-      source,
-    })
-  }
-
-  return mockJobs
+  linkedin: 'preruntime/linkedin-jobs-scraper',
+  indeed: 'dropty/indeed-scraper',
 }
 
 export async function scrapeLinkedInJobs(
@@ -47,50 +29,50 @@ export async function scrapeLinkedInJobs(
   limit = 20
 ): Promise<ScrapedJob[]> {
   if (!APIFY_TOKEN) {
-    console.warn('APIFY_API_TOKEN not set - using mock data')
-    return getMockJobs(searchTerm, location, 'linkedin')
+    throw new Error('APIFY_API_TOKEN not configured')
   }
 
   try {
     const input = {
-      searchTerms: [{ query: searchTerm, location: location ?? 'Worldwide' }],
+      searchTerms: [searchTerm],
+      location: location || 'Worldwide',
       maxResults: limit,
     }
 
-    console.log('Running LinkedIn scraper...')
+    console.log('LinkedIn scraper: Starting with input:', JSON.stringify(input))
 
     const run = await client.actor(ACTOR_IDS.linkedin).call(input) as any
-    
-    console.log('LinkedIn run completed:', run.id)
+
+    console.log('LinkedIn scraper: Run status:', run.status, 'Dataset ID:', run.defaultDatasetId)
 
     if (!run.defaultDatasetId) {
-      console.log('No dataset ID returned')
-      return getMockJobs(searchTerm, location, 'linkedin')
+      throw new Error('No dataset returned from LinkedIn scraper')
     }
 
     const datasetClient = client.dataset(run.defaultDatasetId)
-    const datasetResult = await datasetClient.listItems({ limit })
-    const datasetItems = datasetResult.items as any[]
+    const datasetResult = await datasetClient.listItems({ limit: 100 })
+    const items = datasetResult.items || []
 
-    if (!datasetItems || datasetItems.length === 0) {
-      console.log('No LinkedIn jobs found')
-      return getMockJobs(searchTerm, location, 'linkedin')
+    console.log('LinkedIn scraper: Got', items.length, 'items')
+
+    if (items.length === 0) {
+      throw new Error('No jobs found for this search')
     }
 
-    return datasetItems.map((item: any) => ({
+    return items.slice(0, limit).map((item: any) => ({
       title: item.title || '',
       company: item.companyName || item.company || '',
       location: item.location || '',
-      jobUrl: item.url || item.jobUrl || '',
-      description: item.description || '',
-      salaryMin: item.salaryMin || item.salary?.min,
-      salaryMax: item.salaryMax || item.salary?.max,
-      postedAt: item.postedAt || item.datePosted,
+      jobUrl: item.url || item.link || '',
+      description: item.description?.substring(0, 1000) || '',
+      salaryMin: item.salary?.min || item.salaryMin,
+      salaryMax: item.salary?.max || item.salaryMax,
+      postedAt: item.postedAt || item.date,
       source: 'linkedin' as const,
     }))
   } catch (error) {
     console.error('LinkedIn scraper error:', error)
-    return getMockJobs(searchTerm, location, 'linkedin')
+    throw error
   }
 }
 
@@ -100,53 +82,50 @@ export async function scrapeIndeedJobs(
   limit = 20
 ): Promise<ScrapedJob[]> {
   if (!APIFY_TOKEN) {
-    console.warn('APIFY_API_TOKEN not set - using mock data')
-    return getMockJobs(searchTerm, location, 'indeed')
+    throw new Error('APIFY_API_TOKEN not configured')
   }
 
   try {
     const input = {
-      search: {
-        query: searchTerm,
-        location: location ?? 'Worldwide',
-      },
+      searchTerm,
+      location: location || 'Worldwide',
       maxResults: limit,
     }
 
-    console.log('Running Indeed scraper...')
+    console.log('Indeed scraper: Starting with input:', JSON.stringify(input))
 
     const run = await client.actor(ACTOR_IDS.indeed).call(input) as any
-    
-    console.log('Indeed run completed:', run.id)
+
+    console.log('Indeed scraper: Run status:', run.status, 'Dataset ID:', run.defaultDatasetId)
 
     if (!run.defaultDatasetId) {
-      console.log('No dataset ID returned')
-      return getMockJobs(searchTerm, location, 'indeed')
+      throw new Error('No dataset returned from Indeed scraper')
     }
 
     const datasetClient = client.dataset(run.defaultDatasetId)
-    const datasetResult = await datasetClient.listItems({ limit })
-    const datasetItems = datasetResult.items as any[]
+    const datasetResult = await datasetClient.listItems({ limit: 100 })
+    const items = datasetResult.items || []
 
-    if (!datasetItems || datasetItems.length === 0) {
-      console.log('No Indeed jobs found')
-      return getMockJobs(searchTerm, location, 'indeed')
+    console.log('Indeed scraper: Got', items.length, 'items')
+
+    if (items.length === 0) {
+      throw new Error('No jobs found for this search')
     }
 
-    return datasetItems.map((item: any) => ({
+    return items.slice(0, limit).map((item: any) => ({
       title: item.title || '',
       company: item.company || '',
       location: item.location || '',
-      jobUrl: item.url || '',
-      description: item.description || '',
+      jobUrl: item.url || item.link || '',
+      description: item.description?.substring(0, 1000) || '',
       salaryMin: item.salary?.min,
       salaryMax: item.salary?.max,
-      postedAt: item.datePosted,
+      postedAt: item.date,
       source: 'indeed' as const,
     }))
   } catch (error) {
     console.error('Indeed scraper error:', error)
-    return getMockJobs(searchTerm, location, 'indeed')
+    throw error
   }
 }
 
@@ -157,24 +136,27 @@ export async function scrapeJobs(
   limitPerSource = 10
 ): Promise<ScrapedJob[]> {
   const results: ScrapedJob[] = []
+  const errors: string[] = []
 
-  const promises = sources.map(async (source) => {
-    if (source === 'linkedin') {
-      const jobs = await scrapeLinkedInJobs(searchTerm, location, limitPerSource)
-      return jobs
-    } else if (source === 'indeed') {
-      const jobs = await scrapeIndeedJobs(searchTerm, location, limitPerSource)
-      return jobs
+  for (const source of sources) {
+    try {
+      if (source === 'linkedin') {
+        const jobs = await scrapeLinkedInJobs(searchTerm, location, limitPerSource)
+        results.push(...jobs)
+      } else if (source === 'indeed') {
+        const jobs = await scrapeIndeedJobs(searchTerm, location, limitPerSource)
+        results.push(...jobs)
+      }
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Unknown error'
+      errors.push(`${source}: ${message}`)
+      console.error(`Error scraping ${source}:`, message)
     }
-    return []
-  })
+  }
 
-  const allResults = await Promise.all(promises)
-  allResults.forEach((jobs) => results.push(...jobs))
+  if (results.length === 0) {
+    throw new Error(`No jobs found. Errors: ${errors.join(', ')}`)
+  }
 
   return results
-}
-
-export async function getApifyCredits(): Promise<number> {
-  return 0
 }
