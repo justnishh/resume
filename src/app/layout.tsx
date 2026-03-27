@@ -1,12 +1,13 @@
 import type { Metadata } from 'next'
+import { Inter } from 'next/font/google'
 import './globals.css'
-import { CartProvider } from '@/context/CartContext'
-import Header from '@/components/Header'
-import Footer from '@/components/Footer'
+import { Providers } from './providers'
+
+const inter = Inter({ subsets: ['latin'] })
 
 export const metadata: Metadata = {
-  title: 'Foodie - Restaurant Food Ordering',
-  description: 'Order delicious food online',
+  title: 'Job Tracker Pro - Manage Your Job Applications',
+  description: 'Track job applications, scrape jobs from the web, and manage your resume in one place',
 }
 
 export default function RootLayout({
@@ -15,15 +16,11 @@ export default function RootLayout({
   children: React.ReactNode
 }) {
   return (
-    <html lang="en">
-      <body>
-        <CartProvider>
-          <Header />
-          <main className="min-h-screen bg-background">
-            {children}
-          </main>
-          <Footer />
-        </CartProvider>
+    <html lang="en" className={inter.className}>
+      <body className="bg-background text-foreground antialiased">
+        <Providers>
+          {children}
+        </Providers>
       </body>
     </html>
   )

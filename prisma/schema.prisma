@@ -7,48 +7,225 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-model Category {
-  id        String     @id @default(cuid())
-  name      String
-  slug      String     @unique
-  items     MenuItem[]
-  createdAt DateTime   @default(now())
-  updatedAt DateTime   @updatedAt
+model User {
+  id                   String              @id @default(cuid())
+  name                 String?
+  email                String              @unique
+  emailVerified        DateTime?
+  image                String?
+  createdAt            DateTime            @default(now())
+  updatedAt            DateTime            @updatedAt
+  accounts             Account[]
+  sessions             Session[]
+  searchPreferences    SearchPreference[]
+  jobs                 Job[]
+  resumes              Resume[]
+  applications         Application[]
+  asanaConnection      AsanaConnection?
 }
 
-model MenuItem {
-  id          String      @id @default(cuid())
-  name        String
-  description String?
-  price       Float
-  image       String?
-  available   Boolean     @default(true)
-  category    Category    @relation(fields: [categoryId], references: [id])
-  categoryId  String
-  orderItems  OrderItem[]
-  createdAt   DateTime    @default(now())
-  updatedAt   DateTime    @updatedAt
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String? @db.Text
+  access_token      String? @db.Text
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String? @db.Text
+  session_state     String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
 }
 
-model Order {
-  id              String      @id @default(cuid())
-  customerName    String
-  customerPhone   String
-  customerAddress String?
-  orderType       String      @default("pickup")
-  status          String      @default("pending")
-  total           Float
-  items           OrderItem[]
-  createdAt       DateTime    @default(now())
-  updatedAt       DateTime    @updatedAt
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 
-model OrderItem {
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+}
+
+model SearchPreference {
   id         String   @id @default(cuid())
-  quantity   Int
-  price      Float
-  menuItem   MenuItem @relation(fields: [menuItemId], references: [id])
-  menuItemId String
-  order      Order    @relation(fields: [orderId], references: [id])
-  orderId    String
+  userId     String
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  jobRoles   String[] @default([])
+  locations  String[] @default([])
+  sources    String[] @default(["linkedin", "indeed"])
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+}
+
+enum JobStatus {
+  not_applied
+  applied
+  interview
+  offer
+  rejected
+  hidden
+}
+
+enum JobSource {
+  apify
+  manual
+  linkedin
+  indeed
+}
+
+model Job {
+  id          String     @id @default(cuid())
+  userId      String
+  user        User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  title       String
+  company     String
+  location    String?
+  salaryMin   Int?
+  salaryMax   Int?
+  salaryCurrency String? @default("USD")
+  jobUrl      String?    @db.Text
+  description String?    @db.Text
+  source      JobSource @default(manual)
+  status      JobStatus @default(not_applied)
+  appliedAt   DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  scrapedAt   DateTime?
+  applications Application[]
+  
+  @@index([userId])
+  @@index([status])
+  @@index([createdAt])
+}
+
+model Resume {
+  id           String   @id @default(cuid())
+  userId       String
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  versionName  String
+  isDefault    Boolean  @default(false)
+  data         Json
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+  applications Application[]
+  experience   Experience[]
+  education    Education[]
+  skills       Skill[]
+  projects     Project[]
+  
+  @@index([userId])
+}
+
+model Experience {
+  id          String   @id @default(cuid())
+  resumeId    String
+  resume      Resume   @relation(fields: [resumeId], references: [id], onDelete: Cascade)
+  company     String
+  title       String
+  location    String?
+  startDate   String
+  endDate     String?
+  isCurrent   Boolean  @default(false)
+  description String?  @db.Text
+  order       Int      @default(0)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model Education {
+  id           String   @id @default(cuid())
+  resumeId      String
+  resume       Resume   @relation(fields: [resumeId], references: [id], onDelete: Cascade)
+  institution  String
+  degree       String
+  field        String?
+  startDate    String
+  endDate      String?
+  isCurrent    Boolean  @default(false)
+  description  String?  @db.Text
+  order        Int      @default(0)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+}
+
+model Skill {
+  id        String  @id @default(cuid())
+  resumeId  String
+  resume    Resume  @relation(fields: [resumeId], references: [id], onDelete: Cascade)
+  name      String
+  category  String  @default("technical")
+  order     Int     @default(0)
+}
+
+model Project {
+  id          String   @id @default(cuid())
+  resumeId    String
+  resume      Resume   @relation(fields: [resumeId], references: [id], onDelete: Cascade)
+  name        String
+  description String?  @db.Text
+  url         String?
+  technologies String? @db.Text
+  startDate   String?
+  endDate     String?
+  order       Int      @default(0)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model Application {
+  id          String   @id @default(cuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  jobId       String
+  job         Job      @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  resumeId    String?
+  resume      Resume?  @relation(fields: [resumeId], references: [id], onDelete: SetNull)
+  appliedAt   DateTime @default(now())
+  notes       String?  @db.Text
+  asanaTaskId String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  
+  @@unique([userId, jobId])
+  @@index([userId])
+  @@index([jobId])
+}
+
+model AsanaConnection {
+  id            String   @id @default(cuid())
+  userId        String   @unique
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  accessToken   String
+  refreshToken  String?
+  workspaceGid  String?
+  workspaceName String?
+  connectedAt  DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+}
+
+model AsanaProject {
+  id            String   @id @default(cuid())
+  userId        String
+  asanaGid      String
+  name          String
+  notes         String?  @db.Text
+  completedTasks Json?
+  lastSynced    DateTime @default(now())
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  
+  @@unique([userId, asanaGid])
 }
