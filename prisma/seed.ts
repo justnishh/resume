@@ -1,4 +1,4 @@
-import prisma from '../lib/prisma'
+import prisma from '../src/lib/prisma'
 
 const categories = [
   { name: 'Appetizers', slug: 'appetizers' },
