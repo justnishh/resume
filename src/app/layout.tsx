@@ -17,6 +17,25 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en" className={inter.className}>
+      <head>
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `
+              window.addEventListener('error', function(e) {
+                if (e.message && e.message.includes('No Listener: tabs:outgoing.message.ready')) {
+                  e.preventDefault();
+                  e.stopPropagation();
+                }
+              });
+              window.addEventListener('unhandledrejection', function(e) {
+                if (e.reason && e.reason.message && e.reason.message.includes('No Listener: tabs:outgoing.message.ready')) {
+                  e.preventDefault();
+                }
+              });
+            `,
+          }}
+        />
+      </head>
       <body className="bg-background text-foreground antialiased">
         <Providers>
           {children}
