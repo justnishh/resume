@@ -1,6 +1,8 @@
 import Link from 'next/link'
 import Image from 'next/image'
 
+export const dynamic = 'force-dynamic'
+
 async function getFeaturedItems() {
   const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000'}/api/menu-items`, { 
     cache: 'no-store' 
